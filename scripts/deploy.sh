@@ -5,6 +5,8 @@ echo "Logging in to ECR"
 aws ecr get-login-password --region us-east-1 \
 | docker login --username AWS --password-stdin 991940085316.dkr.ecr.us-east-1.amazonaws.com
 
+docker network create app-network || true
+
 echo "Stopping old container (if exists)"
 docker stop backend || true
 docker rm -f backend || true
