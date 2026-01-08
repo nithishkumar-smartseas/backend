@@ -7,7 +7,7 @@ aws ecr get-login-password --region us-east-1 \
 
 echo "Stopping old container (if exists)"
 docker stop backend || true
-docker rm backend || true
+docker rm -f backend || true
 
 echo "Pulling new image"
 docker pull 991940085316.dkr.ecr.us-east-1.amazonaws.com/backend:latest
