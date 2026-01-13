@@ -1,6 +1,6 @@
 const { NodeSDK } = require("@opentelemetry/sdk-node");
 const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
-const { trace } = require("@opentelemetry/api");
+const { OTLPTraceExporter } = require("@opentelemetry/exporter-trace-otlp-http");
 
 const sdk = new NodeSDK({
   serviceName: "backend",
