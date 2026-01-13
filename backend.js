@@ -6,6 +6,7 @@ function timestamp() {
 
 http.createServer((req, res) => {
   console.log(`[${timestamp()}] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
+  console.log("test")
   res.end("Hello from Backend server02");
 }).listen(4000);
 
