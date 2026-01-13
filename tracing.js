@@ -4,6 +4,9 @@ const { trace } = require("@opentelemetry/api");
 
 const sdk = new NodeSDK({
   serviceName: "backend",
+  traceExporter: new OTLPTraceExporter({
+    url: "http://localhost:4318/v1/traces"
+  }),
   instrumentations: [new HttpInstrumentation()],
 });
 
