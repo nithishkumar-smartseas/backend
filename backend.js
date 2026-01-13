@@ -1,7 +1,12 @@
-const http = require('http');
+const http = require("http");
 
-http.createServer(function (req, res) {
-  res.end('Hello from Backend server02');
+function timestamp() {
+  return new Date().toISOString();   // Grafana-friendly UTC format
+}
+
+http.createServer((req, res) => {
+  console.log(`[${timestamp()}] ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
+  res.end("Hello from Backend server02");
 }).listen(4000);
 
-console.log('Backend running on port 4000');
+console.log(`[${timestamp()}] Backend running on port 4000`);
