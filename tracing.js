@@ -9,11 +9,12 @@ const traceExporter = new OTLPTraceExporter({
 });
 
 const sdk = new NodeSDK({
-  serviceName: "backend", // ✅ supported by NodeSDK
+  serviceName: "backend",
   traceExporter,
   instrumentations: [getNodeAutoInstrumentations()],
 });
 
-sdk.start()
-  .then(() => console.log("✅ Tracing initialized"))
-  .catch(err => console.error("❌ Tracing init failed", err));
+// IMPORTANT: start() is synchronous in your version
+sdk.start();
+
+console.log("✅ OpenTelemetry tracing initialized");
