@@ -12,7 +12,7 @@ docker stop backend || true
 docker rm -f backend || true
 
 echo "Pulling new image"
-docker pull 991940085316.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+docker pull 991940085316.dkr.ecr.us-east-1.amazonaws.com/backend:latest 
 
 docker run -d --name backend --network app-network --restart unless-stopped 991940085316.dkr.ecr.us-east-1.amazonaws.com/backend:latest
 
