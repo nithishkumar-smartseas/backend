@@ -5,13 +5,6 @@ const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumenta
 const { resourceFromAttributes } = require('@opentelemetry/resources');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 
-/**
- * REQUIRED ENV VARS:
- *
- * TEMPO_OTLP_ENDPOINT=https://tempo-prod-us-central-0.grafana.net/otlp/v1/traces
- * GRAFANA_TRACE_AUTH=Basic <base64(username:api_key)>
- */
-
 const traceExporter = new OTLPTraceExporter({
   url: process.env.TEMPO_OTLP_ENDPOINT,
 
