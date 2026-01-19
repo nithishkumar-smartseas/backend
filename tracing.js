@@ -8,7 +8,7 @@ const sdk = new NodeSDK({
     'service.name': 'backend',
   }),
   traceExporter: new OTLPTraceExporter({
-    url: 'http://localhost:4318/v1/traces',
+    url: 'http://172.17.0.1:4318/v1/traces',
   }),
   instrumentations: [getNodeAutoInstrumentations()],
 });
