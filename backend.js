@@ -1,3 +1,4 @@
+require("./tracing")
 const http = require("http");
 const pino = require("pino");
 const { context, trace } = require("@opentelemetry/api");
