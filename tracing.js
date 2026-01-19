@@ -1,17 +1,10 @@
-const { NodeSDK } = require('@opentelemetry/sdk-node');
-const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
-const { resourceFromAttributes } = require('@opentelemetry/resources');
-const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
+const { NodeSDK } = require("@opentelemetry/sdk-node");
+const { HttpInstrumentation } = require("@opentelemetry/instrumentation-http");
+const { trace } = require("@opentelemetry/api");
 
 const sdk = new NodeSDK({
-  resource: resourceFromAttributes({
-    'service.name': 'backend',
-  }),
-  traceExporter: new OTLPTraceExporter({
-    url: 'http://172.17.0.1:4318/v1/traces',
-  }),
-  instrumentations: [getNodeAutoInstrumentations()],
+  serviceName: "backend",
+  instrumentations: [new HttpInstrumentation()],
 });
 
 sdk.start();
-console.log('✅ OpenTelemetry tracing initialized');
