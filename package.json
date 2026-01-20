@@ -7,6 +7,28 @@
     "@opentelemetry/resources": "^2.3.0",
     "@opentelemetry/sdk-node": "^0.209.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "jwks-rsa": "^3.2.1",
     "pino": "^10.1.1"
-  }
+  },
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "backend.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://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@github.com/nithishkumar-smartseas/backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/nithishkumar-smartseas/backend/issues"
+  },
+  "homepage": "https://github.com/nithishkumar-smartseas/backend#readme"
 }
