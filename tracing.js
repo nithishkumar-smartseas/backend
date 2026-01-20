@@ -5,24 +5,23 @@ const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumenta
 const { resourceFromAttributes } = require('@opentelemetry/resources');
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
 
-const traceExporter = new OTLPTraceExporter({
-  url: process.env.TEMPO_OTLP_ENDPOINT,
-
-  headers: {
-    Authorization: process.env.GRAFANA_TRACE_AUTH,
-  },
-});
-
 const sdk = new NodeSDK({
   resource: resourceFromAttributes({
     'service.name': 'backend',
-    'service.environment': process.env.NODE_ENV || 'production',
   }),
 
-  traceExporter,
+  traceExporter: new OTLPTraceExporter({
+    // ✅ Endpoint stays hard-coded (as you requested)
+    url: 'https://tempo-prod-us-central-0.grafana.net/otlp/v1/traces',
+
+    // ✅ Token comes from environment variable
+    headers: {
+      Authorization: `Bearer ${process.env.GRAFANA_CLOUD_TOKEN}`,
+    },
+  }),
+
   instrumentations: [getNodeAutoInstrumentations()],
 });
 
 sdk.start();
-
-console.log('✅ OpenTelemetry tracing initialized (Grafana Cloud Tempo)');
+console.log('✅ OpenTelemetry tracing initialized (Grafana Cloud)');
