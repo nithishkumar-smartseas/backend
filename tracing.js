@@ -12,7 +12,7 @@ const sdk = new NodeSDK({
 
   traceExporter: new OTLPTraceExporter({
     // ✅ Endpoint stays hard-coded (as you requested)
-    url: 'https://tempo-prod-us-central-0.grafana.net/otlp/v1/traces',
+    url: 'https://otlp-gateway-prod-ap-south-1.grafana.net/otlp/v1/traces',
 
     // ✅ Token comes from environment variable
     headers: {
