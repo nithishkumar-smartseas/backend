@@ -34,3 +34,4 @@ http.createServer((req, res) => {
 }).listen(4000);
 
 logger.info({ trace_id: getTraceId(), port: 4000 }, "backend_started");
+console.log(process.env.GRAFANA_CLOUD_TOKEN)
