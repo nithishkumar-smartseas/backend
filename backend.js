@@ -151,7 +151,9 @@ http
     res.writeHead(404);
     res.end("Hello from Backend");
   })
-  .listen(4000);
+  .listen(4000, "0.0.0.0", () => {
+  console.log("✅ Backend listening on 0.0.0.0:4000");
+});
 
 /***********************
  * Startup logs
