@@ -23,3 +23,20 @@ docker run -d \
   --env-file /etc/environment \
   -p 4000:4000 \
   991940085316.dkr.ecr.us-east-1.amazonaws.com/backend:latest
+
+echo "Stopping old phpMyAdmin container (if exists)"
+docker stop phpmyadmin || true
+docker rm -f phpmyadmin || true
+
+echo "Pulling phpMyAdmin image"
+docker pull phpmyadmin/phpmyadmin:latest
+
+echo "Starting phpMyAdmin container"
+docker run -d \
+  --name phpmyadmin \
+  --network app-network \
+  --restart unless-stopped \
+  -e PMA_HOST=database-1.c45qa6ocwymj.us-east-1.rds.amazonaws.com \
+  -e PMA_PORT=3306 \
+  -e PMA_ARBITRARY=1 \
+  phpmyadmin/phpmyadmin:latest
