@@ -7,15 +7,14 @@ const http = require("http");
 const pino = require("pino");
 const jwt = require("jsonwebtoken");
 const jwksClient = require("jwks-rsa");
+const mariadb = require("mariadb");
 const { context, trace } = require("@opentelemetry/api");
 
 /***********************
  * Logger
  ***********************/
 const logger = pino({
-  base: {
-    service: "backend",
-  },
+  base: { service: "backend" },
   timestamp: () => `,"ts":"${new Date().toISOString()}"`,
 });
 
@@ -24,8 +23,7 @@ const logger = pino({
  ***********************/
 function getTraceId() {
   const span = trace.getSpan(context.active());
-  if (!span) return null;
-  return span.spanContext().traceId;
+  return span ? span.spanContext().traceId : null;
 }
 
 /***********************
@@ -33,7 +31,6 @@ function getTraceId() {
  ***********************/
 const REGION = "us-east-1";
 const USER_POOL_ID = "us-east-1_akBTVWhIT";
-
 const ISSUER = `https://cognito-idp.${REGION}.amazonaws.com/${USER_POOL_ID}`;
 
 /***********************
@@ -50,13 +47,22 @@ const jwks = jwksClient({
  ***********************/
 function getKey(header, callback) {
   jwks.getSigningKey(header.kid, (err, key) => {
-    if (err) {
-      callback(err);
-      return;
-    }
+    if (err) return callback(err);
     callback(null, key.getPublicKey());
   });
 }
+
+/***********************
+ * MariaDB (RDS) Connection Pool
+ ***********************/
+const dbPool = mariadb.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: 3306,
+  connectionLimit: 5,
+});
 
 /***********************
  * Authenticate request (JWT REQUIRED)
@@ -65,37 +71,29 @@ function authenticateRequest(req, res, onSuccess) {
   const authHeader = req.headers["authorization"];
 
   if (!authHeader) {
-    res.writeHead(401, { "Content-Type": "text/plain" });
-    res.end("Unauthorized: Missing Authorization header");
-    return;
+    res.writeHead(401);
+    return res.end("Unauthorized: Missing Authorization header");
   }
 
   const [type, token] = authHeader.split(" ");
-
   if (type !== "Bearer" || !token) {
-    res.writeHead(401, { "Content-Type": "text/plain" });
-    res.end("Unauthorized: Invalid Authorization format");
-    return;
+    res.writeHead(401);
+    return res.end("Unauthorized: Invalid Authorization format");
   }
 
   jwt.verify(
     token,
     getKey,
-    {
-      issuer: ISSUER,
-      algorithms: ["RS256"],
-    },
+    { issuer: ISSUER, algorithms: ["RS256"] },
     (err, decoded) => {
       if (err) {
         logger.warn(
           { trace_id: getTraceId(), error: err.message },
           "jwt_verification_failed"
         );
-        res.writeHead(401, { "Content-Type": "text/plain" });
-        res.end("Unauthorized: Invalid or expired token");
-        return;
+        res.writeHead(401);
+        return res.end("Unauthorized: Invalid or expired token");
       }
-
       onSuccess(decoded);
     }
   );
@@ -105,7 +103,7 @@ function authenticateRequest(req, res, onSuccess) {
  * HTTP Server
  ***********************/
 http
-  .createServer((req, res) => {
+  .createServer(async (req, res) => {
     const start = Date.now();
 
     res.on("finish", () => {
@@ -116,32 +114,48 @@ http
           path: req.url,
           status: res.statusCode,
           latency_ms: Date.now() - start,
-          client_ip: req.socket.remoteAddress,
         },
         "http_request"
       );
     });
 
-    // 🔐 ONLY ONE ENDPOINT: /backend (JWT REQUIRED)
+    // 🔐 JWT + RDS endpoint
     if (req.url === "/backend") {
-      authenticateRequest(req, res, (user) => {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            message: "Backend API – Cognito JWT verified",
-            user: {
-              sub: user.sub,
-              email: user.email,
-            },
-            trace_id: getTraceId(),
-          })
-        );
+      return authenticateRequest(req, res, async (user) => {
+        let conn;
+        try {
+          conn = await dbPool.getConnection();
+
+          // Simple DB check query
+          const rows = await conn.query("SELECT NOW() AS db_time");
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              message: "Backend API – JWT verified + RDS connected",
+              database_time: rows[0].db_time,
+              user: {
+                sub: user.sub,
+                email: user.email,
+              },
+              trace_id: getTraceId(),
+            })
+          );
+        } catch (err) {
+          logger.error(
+            { trace_id: getTraceId(), error: err.message },
+            "database_error"
+          );
+          res.writeHead(500);
+          res.end("Database connection failed");
+        } finally {
+          if (conn) conn.release();
+        }
       });
-      return;
     }
 
-    // ❌ EVERYTHING ELSE DENIED
-    res.writeHead(404, { "Content-Type": "text/plain" });
+    // ❌ Everything else blocked
+    res.writeHead(404);
     res.end("Not Found");
   })
   .listen(4000, "0.0.0.0", () => {
@@ -149,11 +163,7 @@ http
   });
 
 /***********************
- * Startup logs
+ * Startup log
  ***********************/
-logger.info(
-  { trace_id: getTraceId(), port: 4000 },
-  "backend_started"
-);
-
+logger.info({ trace_id: getTraceId(), port: 4000 }, "backend_started");
 console.log("Backend running on port 4000");
