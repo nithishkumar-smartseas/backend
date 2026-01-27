@@ -53,19 +53,19 @@ function getKey(header, callback) {
 }
 
 /***********************
- * MariaDB (RDS) Connection Pool
+ * MariaDB (RDS) Pool
  ***********************/
 const dbPool = mariadb.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  database: process.env.DB_NAME, // test_db or backendmariadb
   port: 3306,
   connectionLimit: 5,
 });
 
 /***********************
- * Authenticate request (JWT REQUIRED)
+ * JWT Authentication
  ***********************/
 function authenticateRequest(req, res, onSuccess) {
   const authHeader = req.headers["authorization"];
@@ -119,14 +119,14 @@ http
       );
     });
 
-    // 🔐 JWT + RDS endpoint
+    /***********************
+     * Health / DB check
+     ***********************/
     if (req.url === "/backend") {
       return authenticateRequest(req, res, async (user) => {
         let conn;
         try {
           conn = await dbPool.getConnection();
-
-          // Simple DB check query
           const rows = await conn.query("SELECT NOW() AS db_time");
 
           res.writeHead(200, { "Content-Type": "application/json" });
@@ -154,7 +154,79 @@ http
       });
     }
 
-    // ❌ Everything else blocked
+    /***********************
+     * Get logged-in user
+     ***********************/
+    if (req.url === "/users/me") {
+      return authenticateRequest(req, res, async (user) => {
+        let conn;
+        try {
+          conn = await dbPool.getConnection();
+
+          const rows = await conn.query(
+            "SELECT id, user_id, email, role, created_at FROM users WHERE user_id = ?",
+            [user.sub]
+          );
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              message: "User fetched successfully",
+              data: rows,
+              trace_id: getTraceId(),
+            })
+          );
+        } catch (err) {
+          logger.error(
+            { trace_id: getTraceId(), error: err.message },
+            "user_query_failed"
+          );
+          res.writeHead(500);
+          res.end("Failed to fetch user");
+        } finally {
+          if (conn) conn.release();
+        }
+      });
+    }
+
+    /***********************
+     * Get logged-in user orders
+     ***********************/
+    if (req.url === "/orders/me") {
+      return authenticateRequest(req, res, async (user) => {
+        let conn;
+        try {
+          conn = await dbPool.getConnection();
+
+          const rows = await conn.query(
+            "SELECT product_name, amount, status, created_at FROM orders WHERE user_id = ?",
+            [user.sub]
+          );
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              message: "Orders fetched successfully",
+              data: rows,
+              trace_id: getTraceId(),
+            })
+          );
+        } catch (err) {
+          logger.error(
+            { trace_id: getTraceId(), error: err.message },
+            "orders_query_failed"
+          );
+          res.writeHead(500);
+          res.end("Failed to fetch orders");
+        } finally {
+          if (conn) conn.release();
+        }
+      });
+    }
+
+    /***********************
+     * Default
+     ***********************/
     res.writeHead(404);
     res.end("Not Found");
   })
