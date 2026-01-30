@@ -156,7 +156,7 @@ const server = http.createServer(async (req, res) => {
   /***********************
    * Health / DB check
    ***********************/
-  if (req.url === "/backend") {
+  if (req.url === "/" || req.url === "/backend") {
     return authenticateRequest(req, res, async (user) => {
       let conn;
       try {
