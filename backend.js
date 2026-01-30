@@ -77,7 +77,7 @@ async function getDbSecret() {
 }
 
 /***********************
- * MariaDB Pool (from Secrets Manager)
+ * MariaDB Pool (initialized at startup)
  ***********************/
 let dbPool;
 
@@ -137,134 +137,128 @@ function authenticateRequest(req, res, onSuccess) {
 /***********************
  * HTTP Server
  ***********************/
-http
-  .createServer(async (req, res) => {
-    const start = Date.now();
+const server = http.createServer(async (req, res) => {
+  const start = Date.now();
 
-    res.on("finish", () => {
-      logger.info(
-        {
-          trace_id: getTraceId(),
-          method: req.method,
-          path: req.url,
-          status: res.statusCode,
-          latency_ms: Date.now() - start,
-        },
-        "http_request"
-      );
-    });
-
-    /***********************
-     * Health / DB check
-     ***********************/
-    if (req.url === "/backend") {
-      return authenticateRequest(req, res, async (user) => {
-        let conn;
-        try {
-          conn = await dbPool.getConnection();
-          const rows = await conn.query("SELECT NOW() AS db_time");
-
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              message: "Backend API – JWT verified + RDS connected",
-              database_time: rows[0].db_time,
-              user: {
-                sub: user.sub,
-                email: user.email,
-              },
-              trace_id: getTraceId(),
-            })
-          );
-        } catch (err) {
-          logger.error(
-            { trace_id: getTraceId(), error: err.message },
-            "database_error"
-          );
-          res.writeHead(500);
-          res.end("Database connection failed");
-        } finally {
-          if (conn) conn.release();
-        }
-      });
-    }
-
-    /***********************
-     * Get logged-in user
-     ***********************/
-    if (req.url === "/users/me") {
-      return authenticateRequest(req, res, async (user) => {
-        let conn;
-        try {
-          conn = await dbPool.getConnection();
-
-          const rows = await conn.query(
-            "SELECT id, user_id, email, role, created_at FROM users WHERE user_id = ?",
-            [user.sub]
-          );
-
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              message: "User fetched successfully",
-              data: rows,
-              trace_id: getTraceId(),
-            })
-          );
-        } catch (err) {
-          logger.error(
-            { trace_id: getTraceId(), error: err.message },
-            "user_query_failed"
-          );
-          res.writeHead(500);
-          res.end("Failed to fetch user");
-        } finally {
-          if (conn) conn.release();
-        }
-      });
-    }
-
-    /***********************
-     * Get logged-in user orders
-     ***********************/
-    if (req.url === "/orders/me") {
-      return authenticateRequest(req, res, async (user) => {
-        let conn;
-        try {
-          conn = await dbPool.getConnection();
-
-          const rows = await conn.query(
-            "SELECT product_name, amount, status, created_at FROM orders WHERE user_id = ?",
-            [user.sub]
-          );
-
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              message: "Orders fetched successfully",
-              data: rows,
-              trace_id: getTraceId(),
-            })
-          );
-        } catch (err) {
-          logger.error(
-            { trace_id: getTraceId(), error: err.message },
-            "orders_query_failed"
-          );
-          res.writeHead(500);
-          res.end("Failed to fetch orders");
-        } finally {
-          if (conn) conn.release();
-        }
-      });
-    }
-
-    /***********************
-     * Default
-     ***********************/
-    res.writeHead(404);
-    res.end("Not Found");
+  res.on("finish", () => {
+    logger.info(
+      {
+        trace_id: getTraceId(),
+        method: req.method,
+        path: req.url,
+        status: res.statusCode,
+        latency_ms: Date.now() - start,
+      },
+      "http_request"
+    );
   });
+
+  /***********************
+   * Health / DB check
+   ***********************/
+  if (req.url === "/backend") {
+    return authenticateRequest(req, res, async (user) => {
+      let conn;
+      try {
+        conn = await dbPool.getConnection();
+        const rows = await conn.query("SELECT NOW() AS db_time");
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            message: "Backend API – JWT verified + RDS connected",
+            database_time: rows[0].db_time,
+            user: {
+              sub: user.sub,
+              email: user.email,
+            },
+            trace_id: getTraceId(),
+          })
+        );
+      } catch (err) {
+        logger.error(
+          { trace_id: getTraceId(), error: err.message },
+          "database_error"
+        );
+        res.writeHead(500);
+        res.end("Database connection failed");
+      } finally {
+        if (conn) conn.release();
+      }
+    });
+  }
+
+  /***********************
+   * Get logged-in user
+   ***********************/
+  if (req.url === "/users/me") {
+    return authenticateRequest(req, res, async (user) => {
+      let conn;
+      try {
+        conn = await dbPool.getConnection();
+        const rows = await conn.query(
+          "SELECT id, user_id, email, role, created_at FROM users WHERE user_id = ?",
+          [user.sub]
+        );
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            message: "User fetched successfully",
+            data: rows,
+            trace_id: getTraceId(),
+          })
+        );
+      } catch (err) {
+        logger.error(
+          { trace_id: getTraceId(), error: err.message },
+          "user_query_failed"
+        );
+        res.writeHead(500);
+        res.end("Failed to fetch user");
+      } finally {
+        if (conn) conn.release();
+      }
+    });
+  }
+
+  /***********************
+   * Get logged-in user orders
+   ***********************/
+  if (req.url === "/orders/me") {
+    return authenticateRequest(req, res, async (user) => {
+      let conn;
+      try {
+        conn = await dbPool.getConnection();
+        const rows = await conn.query(
+          "SELECT product_name, amount, status, created_at FROM orders WHERE user_id = ?",
+          [user.sub]
+        );
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            message: "Orders fetched successfully",
+            data: rows,
+            trace_id: getTraceId(),
+          })
+        );
+      } catch (err) {
+        logger.error(
+          { trace_id: getTraceId(), error: err.message },
+          "orders_query_failed"
+        );
+        res.writeHead(500);
+        res.end("Failed to fetch orders");
+      } finally {
+        if (conn) conn.release();
+      }
+    });
+  }
+
+  res.writeHead(404);
+  res.end("Not Found");
+});
 
 /***********************
  * Startup
@@ -273,7 +267,7 @@ http
   try {
     await initDbPool();
 
-    http.listen(4000, "0.0.0.0", () => {
+    server.listen(4000, "0.0.0.0", () => {
       console.log("✅ Backend listening on 0.0.0.0:4000");
       logger.info({ trace_id: getTraceId(), port: 4000 }, "backend_started");
     });
