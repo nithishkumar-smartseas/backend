@@ -11,6 +11,14 @@ const mariadb = require("mariadb");
 const { context, trace } = require("@opentelemetry/api");
 
 /***********************
+ * AWS Secrets Manager
+ ***********************/
+const {
+  SecretsManagerClient,
+  GetSecretValueCommand,
+} = require("@aws-sdk/client-secrets-manager");
+
+/***********************
  * Logger
  ***********************/
 const logger = pino({
@@ -53,16 +61,43 @@ function getKey(header, callback) {
 }
 
 /***********************
- * MariaDB (RDS) Pool
+ * Secrets Manager client
  ***********************/
-const dbPool = mariadb.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME, // test_db or backendmariadb
-  port: 3306,
-  connectionLimit: 5,
+const secretsClient = new SecretsManagerClient({
+  region: REGION,
 });
+
+async function getDbSecret() {
+  const command = new GetSecretValueCommand({
+    SecretId: "prod/rds/mariadb",
+  });
+
+  const response = await secretsClient.send(command);
+  return JSON.parse(response.SecretString);
+}
+
+/***********************
+ * MariaDB Pool (from Secrets Manager)
+ ***********************/
+let dbPool;
+
+async function initDbPool() {
+  const secret = await getDbSecret();
+
+  dbPool = mariadb.createPool({
+    host: secret.host,
+    user: secret.username,
+    password: secret.password,
+    database: secret.dbname,
+    port: secret.port || 3306,
+    connectionLimit: 5,
+  });
+
+  logger.info(
+    { trace_id: getTraceId(), host: secret.host },
+    "db_pool_initialized_via_secrets_manager"
+  );
+}
 
 /***********************
  * JWT Authentication
@@ -229,13 +264,24 @@ http
      ***********************/
     res.writeHead(404);
     res.end("Not Found");
-  })
-  .listen(4000, "0.0.0.0", () => {
-    console.log("✅ Backend listening on 0.0.0.0:4000");
   });
 
 /***********************
- * Startup log
+ * Startup
  ***********************/
-logger.info({ trace_id: getTraceId(), port: 4000 }, "backend_started");
-console.log("Backend running on port 4000");
+(async () => {
+  try {
+    await initDbPool();
+
+    http.listen(4000, "0.0.0.0", () => {
+      console.log("✅ Backend listening on 0.0.0.0:4000");
+      logger.info({ trace_id: getTraceId(), port: 4000 }, "backend_started");
+    });
+  } catch (err) {
+    logger.fatal(
+      { trace_id: getTraceId(), error: err.message },
+      "backend_startup_failed"
+    );
+    process.exit(1);
+  }
+})();
